@@ -30,50 +30,47 @@ include(${PROJECT_SOURCE_DIR}/cmake/building_output.cmake)
 configure_file(${PROJECT_SOURCE_DIR}/cmake/config.h.in cmake_config.h)
 
 
+#   Discover libusb-1.0.
+#
+#   By default we let pkg-config locate the library; this is the portable,
+#   standard mechanism and works out of the box on Linux, macOS (Homebrew) and
+#   MSYS2/MinGW. Packagers or users with libusb in a non-standard location can
+#   still override discovery by passing -DLIBUSB_INCLUDE_DIRS and
+#   -DLIBUSB_LIBRARIES on the cmake command line.
+add_library(libusb INTERFACE)
+
 if (LIBUSB_INCLUDE_DIRS AND LIBUSB_LIBRARIES)
 
-    # in cache already
-    set(LIBUSB_FOUND TRUE)
+    message(STATUS "libusb: using user-provided paths")
+    message(STATUS "  LIBUSB_INCLUDE_DIRS: ${LIBUSB_INCLUDE_DIRS}")
+    message(STATUS "  LIBUSB_LIBRARIES:    ${LIBUSB_LIBRARIES}")
 
-    message(STATUS  "LIBUSB_INCLUDE_DIRS: ${LIBUSB_INCLUDE_DIRS}")
-    message(STATUS  "LIBUSB_LIBRARIES: ${LIBUSB_LIBRARIES}")
+    target_include_directories(libusb INTERFACE ${LIBUSB_INCLUDE_DIRS})
+    target_link_libraries(libusb INTERFACE ${LIBUSB_LIBRARIES})
 
-else (LIBUSB_INCLUDE_DIRS AND LIBUSB_LIBRARIES)
+else ()
 
-    find_path(LIBUSB_INCLUDE_DIR
-      NAMES libusb-1.0/libusb.h
-      DOC "libusb include directory")
-    set(LIBUSB_INCLUDE_DIR ${LIBUSB_INCLUDE_DIR}/libusb-1.0)
-    mark_as_advanced(LIBUSB_INCLUDE_DIR)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBUSB IMPORTED_TARGET libusb-1.0)
 
-    message(STATUS "LIBUSB_INCLUDE_DIR=${LIBUSB_INCLUDE_DIR}")
+    if (NOT LIBUSB_FOUND)
+        message(FATAL_ERROR
+            "libusb-1.0 was not found by pkg-config.\n"
+            "Install the libusb-1.0 development files, for example:\n"
+            "  Debian/Ubuntu : sudo apt install libusb-1.0-0-dev pkg-config\n"
+            "  Fedora        : sudo dnf install libusb1-devel pkgconf-pkg-config\n"
+            "  Arch          : sudo pacman -S libusb pkgconf\n"
+            "  macOS         : brew install libusb pkg-config\n"
+            "  MSYS2/MinGW64 : pacman -S mingw-w64-x86_64-libusb mingw-w64-x86_64-pkgconf\n"
+            "If libusb is in a custom prefix, point pkg-config at it with "
+            "PKG_CONFIG_PATH, or pass -DLIBUSB_INCLUDE_DIRS and -DLIBUSB_LIBRARIES.")
+    endif ()
 
-    find_library(LIBUSB_LIBRARY
-      NAMES libusb-1.0.so libusb-1.0.dylib libusb-1.0.dll
-      DOC "libusb library")
-    mark_as_advanced(LIBUSB_LIBRARY)
+    message(STATUS "libusb: found ${LIBUSB_VERSION} via pkg-config")
 
-    message(STATUS "LIBUSB_LIBRARY=${LIBUSB_LIBRARY}")
+    target_link_libraries(libusb INTERFACE PkgConfig::LIBUSB)
 
-    include(FindPackageHandleStandardArgs)
-    find_package_handle_standard_args(LIBUSB REQUIRED_VARS LIBUSB_LIBRARY LIBUSB_INCLUDE_DIR)
-
-    if ((LIBUSB_INCLUDE_DIR STREQUAL LIBUSB_INCLUDE_DIR-NOTFOUND) OR 
-        (LIBUSB_LIBRARY STREQUAL LIBUSB_LIBRARY-NOTFOUND))
-
-        message(FATAL_ERROR "
-            No libusb path information is provided!
-            LIBUSB_INCLUDE_DIRS=???
-            LIBUSB_LIBRARIES=???
-        ")
-    else()
-
-        set(LIBUSB_INCLUDE_DIRS ${LIBUSB_INCLUDE_DIR})
-        set(LIBUSB_LIBRARIES ${LIBUSB_LIBRARY})
-
-    endif()
-
-endif (LIBUSB_INCLUDE_DIRS AND LIBUSB_LIBRARIES)
+endif ()
 
 #   Set execute file path.
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/build/bin)
@@ -81,10 +78,8 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/build/bin)
 #   Compile exe
 add_executable(${CMAKE_PROJECT_NAME} ${SRC_FILES})
 
-#  include head file.
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${LIBUSB_INCLUDE_DIRS})
-#  link lib file.
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LIBUSB_LIBRARIES})
+#  include headers and link libusb (handled by the libusb interface target).
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE libusb)
 
 #  install configuration.
 include(${PROJECT_SOURCE_DIR}/cmake/install_common.cmake)
