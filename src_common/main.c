@@ -131,7 +131,7 @@ static struct option options[] = {
     {"upload-size", 1, 0, 'Z'},
     {"download", 1, 0, 'D'},
     {"toolbox-mode", 0, 0, 't'},
-    {"wait", 1, 0, 'w'},
+    {"wait", 0, 0, 'w'},
     {0, 0, 0, 0}};
 
 int main(int argc, char *argv[])
